@@ -24,6 +24,15 @@ function processTransactions(transactions: Transaction[]): PortfolioData {
     for (const tx of sorted) {
       if (tx.type === 'buy') {
         lots.push({ date: tx.date, shares: tx.shares, pricePerShare: tx.pricePerShare });
+      } else if (tx.type === 'split') {
+        const factor = tx.splitFactor ?? 1;
+        for (let i = 0; i < lots.length; i++) {
+          lots[i] = {
+            ...lots[i],
+            shares: lots[i].shares * factor,
+            pricePerShare: lots[i].pricePerShare / factor,
+          };
+        }
       } else {
         let remaining = tx.shares;
         let costBasis = 0;

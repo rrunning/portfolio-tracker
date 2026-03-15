@@ -1,10 +1,11 @@
 export interface Transaction {
   id: string;
   ticker: string;
-  type: 'buy' | 'sell';
+  type: 'buy' | 'sell' | 'split';
   date: string; // YYYY-MM-DD
-  shares: number;
-  pricePerShare: number;
+  shares: number;        // buy/sell: actual shares; split: 0
+  pricePerShare: number; // buy/sell: price; split: 0
+  splitFactor?: number;  // split only — e.g. 10 for a 10:1 split
 }
 
 export interface FIFOLot {

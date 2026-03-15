@@ -49,7 +49,13 @@ function computePortfolioValues(
     const shares: Record<string, number> = {};
     for (const tx of sorted) {
       if (tx.date > date) break;
-      shares[tx.ticker] = (shares[tx.ticker] ?? 0) + (tx.type === 'buy' ? tx.shares : -tx.shares);
+      if (tx.type === 'buy') {
+        shares[tx.ticker] = (shares[tx.ticker] ?? 0) + tx.shares;
+      } else if (tx.type === 'sell') {
+        shares[tx.ticker] = (shares[tx.ticker] ?? 0) - tx.shares;
+      } else if (tx.type === 'split') {
+        shares[tx.ticker] = (shares[tx.ticker] ?? 0) * (tx.splitFactor ?? 1);
+      }
     }
     let value = 0;
     let hasAny = false;
@@ -106,7 +112,17 @@ function computeTWRIndex(
     const date = dates[i];
     if (date < firstTxDate) continue;
 
-    // Value BEFORE today's transactions (yesterday's shares × today's prices)
+    // Apply splits first — they don't create cash flow, just adjust share counts.
+    // Doing this before valueBefore prevents the price drop on split day from
+    // registering as a loss in the TWR calculation.
+    const todayTxs = txByDate[date] ?? [];
+    for (const tx of todayTxs) {
+      if (tx.type === 'split') {
+        shares[tx.ticker] = (shares[tx.ticker] ?? 0) * (tx.splitFactor ?? 1);
+      }
+    }
+
+    // Value BEFORE buy/sell transactions (post-split share count × today's prices)
     const valueBefore = valueAt(shares, i);
 
     // Compound the sub-period return since last measurement
@@ -114,11 +130,12 @@ function computeTWRIndex(
       twrIndex *= valueBefore / prevValue;
     }
 
-    // Apply today's transactions
-    const todayTxs = txByDate[date];
-    if (todayTxs) {
-      for (const tx of todayTxs) {
-        shares[tx.ticker] = (shares[tx.ticker] ?? 0) + (tx.type === 'buy' ? tx.shares : -tx.shares);
+    // Apply buy/sell transactions
+    for (const tx of todayTxs) {
+      if (tx.type === 'buy') {
+        shares[tx.ticker] = (shares[tx.ticker] ?? 0) + tx.shares;
+      } else if (tx.type === 'sell') {
+        shares[tx.ticker] = (shares[tx.ticker] ?? 0) - tx.shares;
       }
     }
 

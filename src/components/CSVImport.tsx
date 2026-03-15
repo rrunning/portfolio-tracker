@@ -24,9 +24,13 @@ function parseCSVLine(line: string): string[] {
   return result;
 }
 
+type ValidRow =
+  | { ticker: string; type: 'buy' | 'sell'; date: string; shares: number; pricePerShare: number }
+  | { ticker: string; type: 'split'; date: string; shares: 0; pricePerShare: 0; splitFactor: number };
+
 function parseCSV(text: string) {
   const lines = text.trim().split(/\r?\n/);
-  const valid: { ticker: string; type: 'buy' | 'sell'; date: string; shares: number; pricePerShare: number }[] = [];
+  const valid: ValidRow[] = [];
   const errors: { row: number; message: string }[] = [];
 
   const firstCols = parseCSVLine(lines[0]);
@@ -39,24 +43,33 @@ function parseCSV(text: string) {
     const rowNum = i + 1;
     const cols = parseCSVLine(raw);
 
-    if (cols.length < 5) {
-      errors.push({ row: rowNum, message: 'Expected 5 columns: ticker, type, date, shares, pricePerShare' });
+    if (cols.length < 4) {
+      errors.push({ row: rowNum, message: 'Expected at least 4 columns: ticker, type, date, shares/splitFactor [, pricePerShare]' });
       continue;
     }
 
     const ticker = cols[0].toUpperCase();
     const type = cols[1].toLowerCase();
     const date = cols[2];
-    const shares = parseFloat(cols[3]);
-    const pricePerShare = parseFloat(cols[4]);
 
     if (!ticker) { errors.push({ row: rowNum, message: 'Ticker is required' }); continue; }
-    if (type !== 'buy' && type !== 'sell') { errors.push({ row: rowNum, message: `Type must be "buy" or "sell", got "${cols[1]}"` }); continue; }
+    if (type !== 'buy' && type !== 'sell' && type !== 'split') {
+      errors.push({ row: rowNum, message: `Type must be "buy", "sell", or "split", got "${cols[1]}"` }); continue;
+    }
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) { errors.push({ row: rowNum, message: `Date must be YYYY-MM-DD, got "${cols[2]}"` }); continue; }
-    if (isNaN(shares) || shares <= 0) { errors.push({ row: rowNum, message: `Shares must be a positive number, got "${cols[3]}"` }); continue; }
-    if (isNaN(pricePerShare) || pricePerShare <= 0) { errors.push({ row: rowNum, message: `Price must be a positive number, got "${cols[4]}"` }); continue; }
 
-    valid.push({ ticker, type: type as 'buy' | 'sell', date, shares, pricePerShare });
+    if (type === 'split') {
+      const splitFactor = parseFloat(cols[3]);
+      if (isNaN(splitFactor) || splitFactor <= 0) { errors.push({ row: rowNum, message: `Split factor must be a positive number, got "${cols[3]}"` }); continue; }
+      valid.push({ ticker, type: 'split', date, shares: 0, pricePerShare: 0, splitFactor });
+    } else {
+      if (cols.length < 5) { errors.push({ row: rowNum, message: 'Expected 5 columns for buy/sell: ticker, type, date, shares, pricePerShare' }); continue; }
+      const shares = parseFloat(cols[3]);
+      const pricePerShare = parseFloat(cols[4]);
+      if (isNaN(shares) || shares <= 0) { errors.push({ row: rowNum, message: `Shares must be a positive number, got "${cols[3]}"` }); continue; }
+      if (isNaN(pricePerShare) || pricePerShare <= 0) { errors.push({ row: rowNum, message: `Price must be a positive number, got "${cols[4]}"` }); continue; }
+      valid.push({ ticker, type: type as 'buy' | 'sell', date, shares, pricePerShare });
+    }
   }
 
   return { valid, errors };
@@ -67,6 +80,7 @@ const TEMPLATE = [
   'AAPL,buy,2024-01-15,10,150.00',
   'AAPL,sell,2024-06-01,5,185.00',
   'MSFT,buy,2024-02-01,5,380.00',
+  'MSFT,split,2024-03-01,4,0',
 ].join('\n');
 
 export default function CSVImport() {
@@ -103,7 +117,9 @@ export default function CSVImport() {
     <div className="bg-gray-900 rounded-xl p-5 mb-6 border border-gray-800">
       <h2 className="text-lg font-semibold mb-1">Import CSV</h2>
       <p className="text-xs text-gray-500 mb-4">
-        Columns: <code className="text-gray-400">ticker, type (buy/sell), date (YYYY-MM-DD), shares, pricePerShare</code>
+        Buy/Sell: <code className="text-gray-400">ticker, type (buy/sell), date (YYYY-MM-DD), shares, pricePerShare</code>
+        <br />
+        Split: <code className="text-gray-400">ticker, split, date (YYYY-MM-DD), splitFactor (e.g. 10 for 10:1)</code>
       </p>
       <div className="flex gap-3 flex-wrap">
         <input ref={inputRef} type="file" accept=".csv,text/csv" onChange={handleFile} className="hidden" />
