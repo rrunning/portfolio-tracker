@@ -4,6 +4,7 @@ import AddTransactionForm from './components/AddTransactionForm';
 import CSVImport from './components/CSVImport';
 import TabNav from './components/TabNav';
 import PortfolioSummary from './components/PortfolioSummary';
+import AllocationChart from './components/AllocationChart';
 import HoldingsTable from './components/HoldingsTable';
 import TransactionsTable from './components/TransactionsTable';
 
@@ -20,6 +21,7 @@ export default function App() {
       {activeTab === 'holdings' ? (
         <>
           <PortfolioSummary />
+          <AllocationChart />
           <HoldingsTable />
         </>
       ) : (
