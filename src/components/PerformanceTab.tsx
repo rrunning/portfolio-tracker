@@ -185,18 +185,6 @@ function twrReturn(index: (number | null)[], dates: string[], from: string): num
   return endVal / startVal - 1;
 }
 
-// Compute period return for a plain price series (Value tab % change)
-function valueReturn(values: (number | null)[], dates: string[], from: string): number | null {
-  const startIdx = dates.findIndex((d) => d >= from);
-  if (startIdx === -1) return null;
-  let base: number | null = null;
-  let last: number | null = null;
-  for (let i = startIdx; i < values.length; i++) {
-    if (values[i] != null) { if (base == null) base = values[i]; last = values[i]; }
-  }
-  if (base == null || base === 0 || last == null) return null;
-  return last / base - 1;
-}
 
 interface HistoryData {
   dates: string[];
@@ -254,9 +242,23 @@ export default function PerformanceTab() {
     const spyPrices = history.prices['SPY'] ?? [];
 
     if (subTab === 'value') {
+      // Find the first date from startIdx where we have both a TWR value and an
+      // actual dollar value — this anchors the dollar scale for the period.
+      let baseIdx = startIdx;
+      while (baseIdx < history.dates.length && (twrIndex[baseIdx] == null || portfolioValues[baseIdx] == null)) {
+        baseIdx++;
+      }
+      const baseTwr = twrIndex[baseIdx];
+      const baseValue = portfolioValues[baseIdx];
+
       return history.dates.slice(startIdx).map((date, i) => {
-        const val = portfolioValues[startIdx + i];
-        return { date, value: val };
+        const idx = startIdx + i;
+        const twr = twrIndex[idx];
+        const value =
+          twr != null && baseTwr != null && baseTwr > 0 && baseValue != null
+            ? baseValue * (twr / baseTwr)
+            : null;
+        return { date, value };
       }).filter((d) => d.value != null);
     } else {
       const normPortfolio = normalizeTWR(twrIndex, startIdx);
@@ -270,18 +272,14 @@ export default function PerformanceTab() {
   }, [history, startIdx, subTab, portfolioValues, twrIndex]);
 
   const rangeReturns = useMemo((): Partial<Record<Range, number | null>> => {
-    if (!history) return {};
+    if (!history || twrIndex.length === 0) return {};
     const result: Partial<Record<Range, number | null>> = {};
     for (const { key } of RANGES) {
       const from = firstTxDate ? getPeriodStart(key, firstTxDate) : '';
-      if (subTab === 'value') {
-        result[key] = valueReturn(portfolioValues, history.dates, from);
-      } else {
-        result[key] = twrReturn(twrIndex, history.dates, from);
-      }
+      result[key] = twrReturn(twrIndex, history.dates, from);
     }
     return result;
-  }, [history, portfolioValues, twrIndex, firstTxDate, subTab]);
+  }, [history, twrIndex, firstTxDate]);
 
   const formatXAxis = (dateStr: string) => {
     const d = new Date(dateStr + 'T00:00:00');
