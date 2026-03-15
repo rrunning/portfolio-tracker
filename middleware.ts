@@ -11,7 +11,7 @@ export default async function middleware(
   request: Request,
   _ctx: RequestContext
 ): Promise<Response | undefined> {
-  const password = process.env.SITE_PASSWORD;
+  const password = process.env.SITE_PASSWORD?.trim();
   if (!password) return undefined;
 
   const url = new URL(request.url);
