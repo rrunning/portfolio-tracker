@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useFetchPrices } from './hooks/useFetchPrices';
 import AddTransactionForm from './components/AddTransactionForm';
+import CSVImport from './components/CSVImport';
 import TabNav from './components/TabNav';
 import PortfolioSummary from './components/PortfolioSummary';
 import HoldingsTable from './components/HoldingsTable';
@@ -14,6 +15,7 @@ export default function App() {
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 tracking-tight">Portfolio Tracker</h1>
       <AddTransactionForm />
+      <CSVImport />
       <TabNav activeTab={activeTab} onChange={setActiveTab} />
       {activeTab === 'holdings' ? (
         <>
