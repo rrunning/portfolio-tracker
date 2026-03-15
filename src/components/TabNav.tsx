@@ -1,12 +1,12 @@
 interface Props {
-  activeTab: 'holdings' | 'transactions';
-  onChange: (tab: 'holdings' | 'transactions') => void;
+  activeTab: 'holdings' | 'transactions' | 'performance';
+  onChange: (tab: 'holdings' | 'transactions' | 'performance') => void;
 }
 
 export default function TabNav({ activeTab, onChange }: Props) {
   return (
     <div className="flex gap-1 mb-6 border-b border-gray-800">
-      {(['holdings', 'transactions'] as const).map((tab) => (
+      {(['holdings', 'transactions', 'performance'] as const).map((tab) => (
         <button
           key={tab}
           onClick={() => onChange(tab)}
