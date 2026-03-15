@@ -167,9 +167,9 @@ export default function PerformanceTab() {
   }, [history, startIdx, subTab, portfolioValues]);
 
   // Compute returns for range buttons
-  const rangeReturns = useMemo(() => {
+  const rangeReturns = useMemo((): Partial<Record<Range, number | null>> => {
     if (!history || portfolioValues.length === 0) return {};
-    const result: Record<Range, number | null> = {} as Record<Range, number | null>;
+    const result: Partial<Record<Range, number | null>> = {};
     for (const { key } of RANGES) {
       const from = firstTxDate ? getPeriodStart(key, firstTxDate) : '';
       result[key] = computeReturn(portfolioValues, history.dates, from);
@@ -187,10 +187,11 @@ export default function PerformanceTab() {
     return `${(v * 100).toFixed(0)}%`;
   };
 
-  const tooltipFormatter = (value: number, name: string) => {
+  const tooltipFormatter = (value: unknown, name: unknown): [string, string] => {
+    if (typeof value !== 'number') return ['N/A', String(name)];
     if (subTab === 'value') return [fmt.format(value), 'Portfolio'];
     const label = name === 'portfolio' ? 'Portfolio' : 'S&P 500';
-    return [`${(value * 100).toFixed(2)}%`, label];
+    return [`${(value * 100).toFixed(2)}%`, label as string];
   };
 
   if (transactions.length === 0) {
@@ -234,7 +235,7 @@ export default function PerformanceTab() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               {subTab === 'value' ? (
-                <AreaChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
+                <AreaChart data={chartData as Record<string, unknown>[]} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
                   <defs>
                     <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
@@ -247,20 +248,20 @@ export default function PerformanceTab() {
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: 12 }}
                     labelStyle={{ color: '#9ca3af' }}
-                    formatter={tooltipFormatter}
+                    formatter={tooltipFormatter as Parameters<typeof Tooltip>[0]['formatter']}
                     labelFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   />
                   <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#portfolioGrad)" dot={false} activeDot={{ r: 4 }} />
                 </AreaChart>
               ) : (
-                <LineChart data={chartData} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
+                <LineChart data={chartData as Record<string, unknown>[]} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                   <XAxis dataKey="date" tickFormatter={formatXAxis} tick={{ fill: '#6b7280', fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={60} />
                   <YAxis tickFormatter={formatYAxis} tick={{ fill: '#6b7280', fontSize: 11 }} tickLine={false} axisLine={false} width={60} />
                   <Tooltip
                     contentStyle={{ backgroundColor: '#1f2937', border: '1px solid #374151', borderRadius: '8px', fontSize: 12 }}
                     labelStyle={{ color: '#9ca3af' }}
-                    formatter={tooltipFormatter}
+                    formatter={tooltipFormatter as Parameters<typeof Tooltip>[0]['formatter']}
                     labelFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   />
                   <Legend
