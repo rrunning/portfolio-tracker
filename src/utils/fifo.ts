@@ -1,6 +1,11 @@
-import type { Transaction, FIFOLot, Holding } from '../types';
+import type { Transaction, FIFOLot, Holding, RealizedGain } from '../types';
 
-export function deriveHoldings(transactions: Transaction[]): Holding[] {
+interface PortfolioData {
+  holdings: Holding[];
+  realizedGains: RealizedGain[];
+}
+
+function processTransactions(transactions: Transaction[]): PortfolioData {
   const byTicker = new Map<string, Transaction[]>();
 
   for (const tx of transactions) {
@@ -10,6 +15,7 @@ export function deriveHoldings(transactions: Transaction[]): Holding[] {
   }
 
   const holdings: Holding[] = [];
+  const realizedGains: RealizedGain[] = [];
 
   for (const [ticker, txs] of byTicker) {
     const sorted = [...txs].sort((a, b) => a.date.localeCompare(b.date));
@@ -20,15 +26,32 @@ export function deriveHoldings(transactions: Transaction[]): Holding[] {
         lots.push({ date: tx.date, shares: tx.shares, pricePerShare: tx.pricePerShare });
       } else {
         let remaining = tx.shares;
+        let costBasis = 0;
+
         while (remaining > 0 && lots.length > 0) {
           if (lots[0].shares <= remaining) {
+            costBasis += lots[0].shares * lots[0].pricePerShare;
             remaining -= lots[0].shares;
             lots.shift();
           } else {
+            costBasis += remaining * lots[0].pricePerShare;
             lots[0] = { ...lots[0], shares: lots[0].shares - remaining };
             remaining = 0;
           }
         }
+
+        const proceeds = tx.shares * tx.pricePerShare;
+        const gainLoss = proceeds - costBasis;
+        realizedGains.push({
+          transactionId: tx.id,
+          ticker,
+          date: tx.date,
+          shares: tx.shares,
+          proceeds,
+          costBasis,
+          gainLoss,
+          gainLossPct: costBasis > 0 ? gainLoss / costBasis : 0,
+        });
       }
     }
 
@@ -36,10 +59,26 @@ export function deriveHoldings(transactions: Transaction[]): Holding[] {
     if (netShares <= 0) continue;
 
     const totalInvested = lots.reduce((sum, lot) => sum + lot.shares * lot.pricePerShare, 0);
-    const avgCostBasis = totalInvested / netShares;
-
-    holdings.push({ ticker, netShares, avgCostBasis, totalInvested, lots });
+    holdings.push({
+      ticker,
+      netShares,
+      avgCostBasis: totalInvested / netShares,
+      totalInvested,
+      lots,
+    });
   }
 
-  return holdings;
+  return { holdings, realizedGains };
+}
+
+export function deriveHoldings(transactions: Transaction[]): Holding[] {
+  return processTransactions(transactions).holdings;
+}
+
+export function deriveRealizedGains(transactions: Transaction[]): RealizedGain[] {
+  return processTransactions(transactions).realizedGains;
+}
+
+export function derivePortfolio(transactions: Transaction[]): PortfolioData {
+  return processTransactions(transactions);
 }

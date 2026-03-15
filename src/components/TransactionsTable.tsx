@@ -1,8 +1,9 @@
 import { useMemo } from 'react';
 import { usePortfolioStore } from '../store/usePortfolioStore';
+import { deriveRealizedGains } from '../utils/fifo';
 import TransactionRow from './TransactionRow';
 
-const COLUMNS = ['Type', 'Ticker', 'Date', 'Shares', 'Price / Share', 'Total', ''];
+const COLUMNS = ['Type', 'Ticker', 'Date', 'Shares', 'Price / Share', 'Total', 'Realized G/L', ''];
 
 export default function TransactionsTable() {
   const transactions = usePortfolioStore((s) => s.transactions);
@@ -11,6 +12,11 @@ export default function TransactionsTable() {
     () => [...transactions].sort((a, b) => b.date.localeCompare(a.date) || b.id.localeCompare(a.id)),
     [transactions]
   );
+
+  const realizedGainMap = useMemo(() => {
+    const gains = deriveRealizedGains(transactions);
+    return new Map(gains.map((g) => [g.transactionId, g]));
+  }, [transactions]);
 
   if (sorted.length === 0) {
     return (
@@ -27,13 +33,17 @@ export default function TransactionsTable() {
           <thead>
             <tr className="text-left text-gray-500 text-xs uppercase tracking-wider">
               {COLUMNS.map((col) => (
-                <th key={col} className="px-4 py-3 font-medium">{col}</th>
+                <th key={col} className="px-4 py-3 font-medium whitespace-nowrap">{col}</th>
               ))}
             </tr>
           </thead>
           <tbody>
             {sorted.map((tx) => (
-              <TransactionRow key={tx.id} transaction={tx} />
+              <TransactionRow
+                key={tx.id}
+                transaction={tx}
+                realizedGain={realizedGainMap.get(tx.id)}
+              />
             ))}
           </tbody>
         </table>

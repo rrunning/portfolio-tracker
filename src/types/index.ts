@@ -21,6 +21,17 @@ export interface Holding {
   lots: FIFOLot[];
 }
 
+export interface RealizedGain {
+  transactionId: string;
+  ticker: string;
+  date: string;
+  shares: number;
+  proceeds: number;
+  costBasis: number;
+  gainLoss: number;
+  gainLossPct: number;
+}
+
 export interface PriceMap {
   [ticker: string]: number;
 }

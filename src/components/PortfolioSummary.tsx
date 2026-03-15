@@ -1,6 +1,6 @@
 import { useMemo } from 'react';
 import { usePortfolioStore } from '../store/usePortfolioStore';
-import { deriveHoldings } from '../utils/fifo';
+import { derivePortfolio } from '../utils/fifo';
 
 const fmt = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
 const pct = new Intl.NumberFormat('en-US', { style: 'percent', minimumFractionDigits: 2 });
@@ -9,9 +9,9 @@ export default function PortfolioSummary() {
   const transactions = usePortfolioStore((s) => s.transactions);
   const prices = usePortfolioStore((s) => s.prices);
 
-  const holdings = useMemo(() => deriveHoldings(transactions), [transactions]);
+  const { holdings, realizedGains } = useMemo(() => derivePortfolio(transactions), [transactions]);
 
-  if (holdings.length === 0) return null;
+  if (holdings.length === 0 && realizedGains.length === 0) return null;
 
   let totalCost = 0;
   let totalValue = 0;
@@ -27,12 +27,17 @@ export default function PortfolioSummary() {
     }
   }
 
-  const totalGainLoss = totalValue - totalCost;
-  const totalGainLossPct = totalCost > 0 ? totalGainLoss / totalCost : 0;
-  const isPositive = totalGainLoss >= 0;
+  const unrealizedGainLoss = totalValue - totalCost;
+  const unrealizedGainLossPct = totalCost > 0 ? unrealizedGainLoss / totalCost : 0;
+  const isUnrealizedPositive = unrealizedGainLoss >= 0;
+
+  const totalRealizedGainLoss = realizedGains.reduce((sum, g) => sum + g.gainLoss, 0);
+  const totalRealizedCost = realizedGains.reduce((sum, g) => sum + g.costBasis, 0);
+  const totalRealizedPct = totalRealizedCost > 0 ? totalRealizedGainLoss / totalRealizedCost : 0;
+  const isRealizedPositive = totalRealizedGainLoss >= 0;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
       <SummaryCard label="Total Cost Basis" value={fmt.format(totalCost)} />
       <SummaryCard
         label="Market Value"
@@ -40,24 +45,34 @@ export default function PortfolioSummary() {
         muted={!allPricesLoaded}
       />
       <SummaryCard
-        label="Total Gain / Loss"
+        label="Unrealized G/L"
         value={
           allPricesLoaded
-            ? `${isPositive ? '+' : ''}${fmt.format(totalGainLoss)}`
+            ? `${isUnrealizedPositive ? '+' : ''}${fmt.format(unrealizedGainLoss)}`
             : '—'
         }
-        accent={allPricesLoaded ? (isPositive ? 'green' : 'red') : undefined}
+        accent={allPricesLoaded ? (isUnrealizedPositive ? 'green' : 'red') : undefined}
         muted={!allPricesLoaded}
       />
       <SummaryCard
-        label="Return"
+        label="Unrealized Return"
         value={
           allPricesLoaded
-            ? `${isPositive ? '+' : ''}${pct.format(totalGainLossPct)}`
+            ? `${isUnrealizedPositive ? '+' : ''}${pct.format(unrealizedGainLossPct)}`
             : '—'
         }
-        accent={allPricesLoaded ? (isPositive ? 'green' : 'red') : undefined}
+        accent={allPricesLoaded ? (isUnrealizedPositive ? 'green' : 'red') : undefined}
         muted={!allPricesLoaded}
+      />
+      <SummaryCard
+        label="Realized G/L"
+        value={
+          realizedGains.length > 0
+            ? `${isRealizedPositive ? '+' : ''}${fmt.format(totalRealizedGainLoss)} (${isRealizedPositive ? '+' : ''}${pct.format(totalRealizedPct)})`
+            : '—'
+        }
+        accent={realizedGains.length > 0 ? (isRealizedPositive ? 'green' : 'red') : undefined}
+        muted={realizedGains.length === 0}
       />
     </div>
   );
