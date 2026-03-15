@@ -31,7 +31,9 @@ export default function AllocationChart() {
       return { ticker: h.ticker, value, usingCostBasis: price === undefined };
     });
     const total = items.reduce((sum, i) => sum + i.value, 0);
-    return items.map((i) => ({ ...i, allocation: total > 0 ? i.value / total : 0 }));
+    return items
+      .map((i) => ({ ...i, allocation: total > 0 ? i.value / total : 0 }))
+      .sort((a, b) => b.value - a.value);
   }, [holdings, prices]);
 
   if (data.length === 0) return null;
