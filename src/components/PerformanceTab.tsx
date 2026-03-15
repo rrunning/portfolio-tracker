@@ -36,52 +36,140 @@ function getPeriodStart(range: Range, firstTxDate: string): string {
   return str < firstTxDate ? firstTxDate : str;
 }
 
+// Portfolio market value at each date — used for the Value tab
 function computePortfolioValues(
   transactions: Transaction[],
   dates: string[],
   prices: Record<string, (number | null)[]>,
 ): (number | null)[] {
   if (transactions.length === 0) return dates.map(() => null);
-
-  // Build a timeline of share counts per ticker
   const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
 
   return dates.map((date, dateIdx) => {
-    // Compute shares held as of this date
     const shares: Record<string, number> = {};
     for (const tx of sorted) {
       if (tx.date > date) break;
       shares[tx.ticker] = (shares[tx.ticker] ?? 0) + (tx.type === 'buy' ? tx.shares : -tx.shares);
     }
-
     let value = 0;
     let hasAny = false;
-
     for (const [ticker, qty] of Object.entries(shares)) {
       if (qty <= 0) continue;
-      const tickerPrices = prices[ticker];
-      if (!tickerPrices) continue;
-      const price = tickerPrices[dateIdx];
-      if (price == null) continue;
-      value += qty * price;
+      const p = prices[ticker]?.[dateIdx];
+      if (p == null) continue;
+      value += qty * p;
       hasAny = true;
     }
-
     return hasAny ? value : null;
   });
 }
 
-function normalizeSeries(values: (number | null)[], startIdx: number): (number | null)[] {
-  // Find first non-null value at or after startIdx
+// Time-Weighted Return index — used for the Performance tab.
+// Chains sub-period returns between each cash flow, so new investments
+// don't inflate the apparent return. Returns a running index (1.0 = day of
+// first purchase, 1.20 = +20% return since first purchase).
+function computeTWRIndex(
+  transactions: Transaction[],
+  dates: string[],
+  prices: Record<string, (number | null)[]>,
+): (number | null)[] {
+  if (transactions.length === 0) return dates.map(() => null);
+
+  const sorted = [...transactions].sort((a, b) => a.date.localeCompare(b.date));
+  const firstTxDate = sorted[0].date;
+
+  const txByDate: Record<string, Transaction[]> = {};
+  for (const tx of sorted) {
+    (txByDate[tx.date] ??= []).push(tx);
+  }
+
+  function valueAt(sharesMap: Record<string, number>, dateIdx: number): number | null {
+    let total = 0;
+    let hasAny = false;
+    for (const [ticker, qty] of Object.entries(sharesMap)) {
+      if (qty <= 0) continue;
+      const p = prices[ticker]?.[dateIdx];
+      if (p == null) continue;
+      total += qty * p;
+      hasAny = true;
+    }
+    return hasAny ? total : null;
+  }
+
+  const result: (number | null)[] = dates.map(() => null);
+  let twrIndex = 1.0;
+  let shares: Record<string, number> = {};
+  let prevValue: number | null = null;
+  let started = false;
+
+  for (let i = 0; i < dates.length; i++) {
+    const date = dates[i];
+    if (date < firstTxDate) continue;
+
+    // Value BEFORE today's transactions (yesterday's shares × today's prices)
+    const valueBefore = valueAt(shares, i);
+
+    // Compound the sub-period return since last measurement
+    if (started && prevValue != null && prevValue > 0 && valueBefore != null) {
+      twrIndex *= valueBefore / prevValue;
+    }
+
+    // Apply today's transactions
+    const todayTxs = txByDate[date];
+    if (todayTxs) {
+      for (const tx of todayTxs) {
+        shares[tx.ticker] = (shares[tx.ticker] ?? 0) + (tx.type === 'buy' ? tx.shares : -tx.shares);
+      }
+    }
+
+    // Value AFTER today's transactions → reference for next day
+    const valueAfter = valueAt(shares, i);
+    if (valueAfter != null) {
+      prevValue = valueAfter;
+      started = true;
+    }
+
+    if (started) result[i] = twrIndex;
+  }
+
+  return result;
+}
+
+// Normalize a TWR index series relative to a period start → shows % return within that period
+function normalizeTWR(twrIndex: (number | null)[], startIdx: number): (number | null)[] {
+  let base: number | null = null;
+  for (let i = startIdx; i < twrIndex.length; i++) {
+    if (twrIndex[i] != null) { base = twrIndex[i]!; break; }
+  }
+  if (base == null || base === 0) return twrIndex.map(() => null);
+  return twrIndex.map((v, i) => i < startIdx ? null : (v != null ? v / base! - 1 : null));
+}
+
+// Normalize a price series (SPY) relative to a period start
+function normalizePrice(values: (number | null)[], startIdx: number): (number | null)[] {
   let base: number | null = null;
   for (let i = startIdx; i < values.length; i++) {
     if (values[i] != null) { base = values[i]!; break; }
   }
   if (base == null || base === 0) return values.map(() => null);
-  return values.map((v, i) => i < startIdx ? null : (v != null ? (v - base!) / base! : null));
+  return values.map((v, i) => i < startIdx ? null : (v != null ? v / base! - 1 : null));
 }
 
-function computeReturn(values: (number | null)[], dates: string[], from: string): number | null {
+// Compute period return from a TWR index
+function twrReturn(index: (number | null)[], dates: string[], from: string): number | null {
+  const startIdx = dates.findIndex((d) => d >= from);
+  if (startIdx === -1) return null;
+  let startVal: number | null = null;
+  let endVal: number | null = null;
+  for (let i = startIdx; i < index.length; i++) {
+    if (index[i] != null) { if (startVal == null) startVal = index[i]; endVal = index[i]; }
+  }
+  if (startVal == null || startVal === 0 || endVal == null) return null;
+  return endVal / startVal - 1;
+}
+
+// Compute period return for a plain price series (Value tab % change)
+function valueReturn(values: (number | null)[], dates: string[], from: string): number | null {
   const startIdx = dates.findIndex((d) => d >= from);
   if (startIdx === -1) return null;
   let base: number | null = null;
@@ -90,7 +178,7 @@ function computeReturn(values: (number | null)[], dates: string[], from: string)
     if (values[i] != null) { if (base == null) base = values[i]; last = values[i]; }
   }
   if (base == null || base === 0 || last == null) return null;
-  return (last - base) / base;
+  return last / base - 1;
 }
 
 interface HistoryData {
@@ -128,6 +216,11 @@ export default function PerformanceTab() {
     return computePortfolioValues(transactions, history.dates, history.prices);
   }, [history, transactions]);
 
+  const twrIndex = useMemo(() => {
+    if (!history) return [];
+    return computeTWRIndex(transactions, history.dates, history.prices);
+  }, [history, transactions]);
+
   const periodStart = useMemo(() => {
     if (!firstTxDate) return '';
     return getPeriodStart(range, firstTxDate);
@@ -139,7 +232,6 @@ export default function PerformanceTab() {
     return idx === -1 ? 0 : idx;
   }, [history, periodStart]);
 
-  // Build chart data
   const chartData = useMemo(() => {
     if (!history) return [];
     const spyPrices = history.prices['SPY'] ?? [];
@@ -150,32 +242,29 @@ export default function PerformanceTab() {
         return { date, value: val };
       }).filter((d) => d.value != null);
     } else {
-      // Performance mode: normalize both series
-      const normPortfolio = normalizeSeries(portfolioValues, startIdx);
-      const spyValues = spyPrices;
-      const normSpy = normalizeSeries(spyValues, startIdx);
+      const normPortfolio = normalizeTWR(twrIndex, startIdx);
+      const normSpy = normalizePrice(spyPrices, startIdx);
 
       return history.dates.slice(startIdx).map((date, i) => {
         const idx = startIdx + i;
-        return {
-          date,
-          portfolio: normPortfolio[idx],
-          spy: normSpy[idx],
-        };
+        return { date, portfolio: normPortfolio[idx], spy: normSpy[idx] };
       }).filter((d) => d.portfolio != null || d.spy != null);
     }
-  }, [history, startIdx, subTab, portfolioValues]);
+  }, [history, startIdx, subTab, portfolioValues, twrIndex]);
 
-  // Compute returns for range buttons
   const rangeReturns = useMemo((): Partial<Record<Range, number | null>> => {
-    if (!history || portfolioValues.length === 0) return {};
+    if (!history) return {};
     const result: Partial<Record<Range, number | null>> = {};
     for (const { key } of RANGES) {
       const from = firstTxDate ? getPeriodStart(key, firstTxDate) : '';
-      result[key] = computeReturn(portfolioValues, history.dates, from);
+      if (subTab === 'value') {
+        result[key] = valueReturn(portfolioValues, history.dates, from);
+      } else {
+        result[key] = twrReturn(twrIndex, history.dates, from);
+      }
     }
     return result;
-  }, [history, portfolioValues, firstTxDate]);
+  }, [history, portfolioValues, twrIndex, firstTxDate, subTab]);
 
   const formatXAxis = (dateStr: string) => {
     const d = new Date(dateStr + 'T00:00:00');
@@ -193,6 +282,14 @@ export default function PerformanceTab() {
     const label = name === 'portfolio' ? 'Portfolio' : 'S&P 500';
     return [`${(value * 100).toFixed(2)}%`, label as string];
   };
+
+  // Last non-null index per series, for end-of-line labels in performance mode
+  const lastPortfolioIdx = chartData.reduce(
+    (last, d, i) => ((d as { portfolio?: number | null }).portfolio != null ? i : last), -1,
+  );
+  const lastSpyIdx = chartData.reduce(
+    (last, d, i) => ((d as { spy?: number | null }).spy != null ? i : last), -1,
+  );
 
   if (transactions.length === 0) {
     return (
@@ -221,7 +318,6 @@ export default function PerformanceTab() {
         ))}
       </div>
 
-      {/* Loading / error */}
       {loading && (
         <div className="py-16 text-center text-blue-400 text-sm">Loading historical data…</div>
       )}
@@ -231,7 +327,6 @@ export default function PerformanceTab() {
 
       {!loading && !error && history && (
         <>
-          {/* Chart */}
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               {subTab === 'value' ? (
@@ -254,7 +349,7 @@ export default function PerformanceTab() {
                   <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#portfolioGrad)" dot={false} activeDot={{ r: 4 }} />
                 </AreaChart>
               ) : (
-                <LineChart data={chartData as Record<string, unknown>[]} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
+                <LineChart data={chartData as Record<string, unknown>[]} margin={{ top: 4, right: 72, bottom: 0, left: 10 }}>
                   <CartesianGrid strokeDasharray="3 3" stroke="#1f2937" vertical={false} />
                   <XAxis dataKey="date" tickFormatter={formatXAxis} tick={{ fill: '#6b7280', fontSize: 11 }} tickLine={false} axisLine={false} minTickGap={60} />
                   <YAxis tickFormatter={formatYAxis} tick={{ fill: '#6b7280', fontSize: 11 }} tickLine={false} axisLine={false} width={60} />
@@ -268,14 +363,27 @@ export default function PerformanceTab() {
                     formatter={(v) => v === 'portfolio' ? 'Portfolio' : 'S&P 500'}
                     wrapperStyle={{ fontSize: 12, color: '#9ca3af' }}
                   />
-                  <Line type="monotone" dataKey="portfolio" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }} />
-                  <Line type="monotone" dataKey="spy" stroke="#6b7280" strokeWidth={1.5} strokeDasharray="5 3" dot={false} activeDot={{ r: 3 }} />
+                  <Line
+                    type="monotone" dataKey="portfolio" stroke="#3b82f6" strokeWidth={2} dot={false} activeDot={{ r: 4 }}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    label={(props: any) => {
+                      if (props.index !== lastPortfolioIdx || props.value == null) return null;
+                      return <text x={props.x + 8} y={props.y} fill="#3b82f6" fontSize={11} fontWeight={600} dominantBaseline="middle">{fmtPct(props.value)}</text>;
+                    }}
+                  />
+                  <Line
+                    type="monotone" dataKey="spy" stroke="#6b7280" strokeWidth={1.5} strokeDasharray="5 3" dot={false} activeDot={{ r: 3 }}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    label={(props: any) => {
+                      if (props.index !== lastSpyIdx || props.value == null) return null;
+                      return <text x={props.x + 8} y={props.y} fill="#9ca3af" fontSize={11} fontWeight={600} dominantBaseline="middle">{fmtPct(props.value)}</text>;
+                    }}
+                  />
                 </LineChart>
               )}
             </ResponsiveContainer>
           </div>
 
-          {/* Range selector + returns */}
           <div className="flex flex-wrap gap-2 mt-4 justify-center">
             {RANGES.map(({ label, key }) => {
               const ret = rangeReturns[key];
