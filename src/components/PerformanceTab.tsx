@@ -283,13 +283,17 @@ export default function PerformanceTab() {
     return [`${(value * 100).toFixed(2)}%`, label as string];
   };
 
-  // Last non-null index per series, for end-of-line labels in performance mode
+  // Last non-null index per series, for end-of-line labels
+  const lastValueIdx = chartData.reduce(
+    (last, d, i) => ((d as { value?: number | null }).value != null ? i : last), -1,
+  );
   const lastPortfolioIdx = chartData.reduce(
     (last, d, i) => ((d as { portfolio?: number | null }).portfolio != null ? i : last), -1,
   );
   const lastSpyIdx = chartData.reduce(
     (last, d, i) => ((d as { spy?: number | null }).spy != null ? i : last), -1,
   );
+  const currentRangeReturn = rangeReturns[range] ?? null;
 
   if (transactions.length === 0) {
     return (
@@ -330,7 +334,7 @@ export default function PerformanceTab() {
           <div className="h-72">
             <ResponsiveContainer width="100%" height="100%">
               {subTab === 'value' ? (
-                <AreaChart data={chartData as Record<string, unknown>[]} margin={{ top: 4, right: 4, bottom: 0, left: 10 }}>
+                <AreaChart data={chartData as Record<string, unknown>[]} margin={{ top: 4, right: 72, bottom: 0, left: 10 }}>
                   <defs>
                     <linearGradient id="portfolioGrad" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.25} />
@@ -346,7 +350,14 @@ export default function PerformanceTab() {
                     formatter={tooltipFormatter as Parameters<typeof Tooltip>[0]['formatter']}
                     labelFormatter={(v) => new Date(v + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                   />
-                  <Area type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#portfolioGrad)" dot={false} activeDot={{ r: 4 }} />
+                  <Area
+                    type="monotone" dataKey="value" stroke="#3b82f6" strokeWidth={2} fill="url(#portfolioGrad)" dot={false} activeDot={{ r: 4 }}
+                    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                    label={(props: any) => {
+                      if (props.index !== lastValueIdx || currentRangeReturn == null) return null;
+                      return <text x={props.x + 8} y={props.y} fill="#3b82f6" fontSize={11} fontWeight={600} dominantBaseline="middle">{fmtPct(currentRangeReturn)}</text>;
+                    }}
+                  />
                 </AreaChart>
               ) : (
                 <LineChart data={chartData as Record<string, unknown>[]} margin={{ top: 4, right: 72, bottom: 0, left: 10 }}>

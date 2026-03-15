@@ -11,12 +11,13 @@ import PerformanceTab from './components/PerformanceTab';
 
 export default function App() {
   useFetchPrices();
-  const [activeTab, setActiveTab] = useState<'holdings' | 'transactions' | 'performance'>('holdings');
+  const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'transactions'>('overview');
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 max-w-6xl mx-auto">
       <h1 className="text-3xl font-bold mb-6 tracking-tight">Portfolio Tracker</h1>
       <TabNav activeTab={activeTab} onChange={setActiveTab} />
+      {activeTab === 'overview' && <PerformanceTab />}
       {activeTab === 'holdings' && (
         <>
           <PortfolioSummary />
@@ -31,7 +32,6 @@ export default function App() {
           <TransactionsTable />
         </>
       )}
-      {activeTab === 'performance' && <PerformanceTab />}
     </div>
   );
 }
