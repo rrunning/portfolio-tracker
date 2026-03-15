@@ -22,11 +22,14 @@ export default function TransactionRow({ transaction, realizedGain }: Props) {
   const removeTransaction = usePortfolioStore((s) => s.removeTransaction);
   const displayDate = new Date(transaction.date + 'T00:00:00').toLocaleDateString();
   const isSplit = transaction.type === 'split';
+  const isDividend = transaction.type === 'dividend';
 
   const badgeClass = isSplit
     ? 'bg-yellow-900/60 text-yellow-400'
     : transaction.type === 'buy'
     ? 'bg-green-900/60 text-green-400'
+    : isDividend
+    ? 'bg-blue-900/60 text-blue-400'
     : 'bg-red-900/60 text-red-400';
 
   const isPositive = realizedGain !== undefined && realizedGain.gainLoss >= 0;
@@ -46,15 +49,21 @@ export default function TransactionRow({ transaction, realizedGain }: Props) {
           : transaction.shares.toLocaleString(undefined, { maximumFractionDigits: 6 })}
       </td>
       <td className="px-4 py-3 text-gray-300">
-        {isSplit ? <span className="text-gray-600">—</span> : fmt.format(transaction.pricePerShare)}
+        {isSplit
+          ? <span className="text-gray-600">—</span>
+          : isDividend
+          ? <span className="text-blue-300">{fmt.format(transaction.pricePerShare)}/share</span>
+          : fmt.format(transaction.pricePerShare)}
       </td>
       <td className="px-4 py-3 text-gray-300">
         {isSplit
           ? <span className="text-gray-600">—</span>
-          : fmt.format(transaction.shares * transaction.pricePerShare)}
+          : <span className={isDividend ? 'text-blue-300' : ''}>
+              {fmt.format(transaction.shares * transaction.pricePerShare)}
+            </span>}
       </td>
-      <td className={`px-4 py-3 font-medium ${isSplit ? '' : realizedGain === undefined ? '' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
-        {isSplit || realizedGain === undefined ? (
+      <td className={`px-4 py-3 font-medium ${isSplit || isDividend ? '' : realizedGain === undefined ? '' : isPositive ? 'text-green-400' : 'text-red-400'}`}>
+        {isSplit || isDividend || realizedGain === undefined ? (
           <span className="text-gray-600">—</span>
         ) : (
           <span>

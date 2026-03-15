@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useFetchPrices } from './hooks/useFetchPrices';
+import { useFetchHistory } from './hooks/useFetchHistory';
 import AddTransactionForm from './components/AddTransactionForm';
 import CSVImport from './components/CSVImport';
 import TabNav from './components/TabNav';
@@ -8,9 +9,11 @@ import AllocationChart from './components/AllocationChart';
 import HoldingsTable from './components/HoldingsTable';
 import TransactionsTable from './components/TransactionsTable';
 import PerformanceTab from './components/PerformanceTab';
+import DividendSuggestionBanner from './components/DividendSuggestionBanner';
 
 export default function App() {
   useFetchPrices();
+  useFetchHistory();
   const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'transactions'>('overview');
 
   return (
@@ -27,6 +30,7 @@ export default function App() {
       )}
       {activeTab === 'transactions' && (
         <>
+          <DividendSuggestionBanner />
           <AddTransactionForm />
           <CSVImport />
           <TransactionsTable />

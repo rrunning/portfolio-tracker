@@ -22,6 +22,7 @@ function processTransactions(transactions: Transaction[]): PortfolioData {
     const lots: FIFOLot[] = [];
 
     for (const tx of sorted) {
+      if (tx.type === 'dividend') continue; // cash income — no lot effect
       if (tx.type === 'buy') {
         lots.push({ date: tx.date, shares: tx.shares, pricePerShare: tx.pricePerShare });
       } else if (tx.type === 'split') {
@@ -90,4 +91,19 @@ export function deriveRealizedGains(transactions: Transaction[]): RealizedGain[]
 
 export function derivePortfolio(transactions: Transaction[]): PortfolioData {
   return processTransactions(transactions);
+}
+
+export function getSharesOnDate(transactions: Transaction[], ticker: string, date: string): number {
+  const tickerTxs = transactions
+    .filter((t) => t.ticker === ticker && t.date <= date)
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  let shares = 0;
+  for (const tx of tickerTxs) {
+    if (tx.type === 'buy') shares += tx.shares;
+    else if (tx.type === 'sell') shares -= tx.shares;
+    else if (tx.type === 'split') shares *= tx.splitFactor ?? 1;
+    // dividend has no effect on share count
+  }
+  return Math.max(0, shares);
 }

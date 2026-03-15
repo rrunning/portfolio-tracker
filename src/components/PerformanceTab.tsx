@@ -1,4 +1,4 @@
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useMemo } from 'react';
 import {
   AreaChart, Area, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -125,9 +125,18 @@ function computeTWRIndex(
     // Value BEFORE buy/sell transactions (post-split share count × today's prices)
     const valueBefore = valueAt(shares, i);
 
-    // Compound the sub-period return since last measurement
-    if (started && prevValue != null && prevValue > 0 && valueBefore != null) {
-      twrIndex *= valueBefore / prevValue;
+    // Compound the sub-period return since last measurement.
+    // Dividends add income to prevValue so that subsequent appreciation is
+    // measured from the correct post-dividend portfolio value.
+    let adjustedPrevValue = prevValue;
+    for (const tx of todayTxs) {
+      if (tx.type === 'dividend' && adjustedPrevValue != null) {
+        adjustedPrevValue += tx.shares * tx.pricePerShare;
+      }
+    }
+
+    if (started && adjustedPrevValue != null && adjustedPrevValue > 0 && valueBefore != null) {
+      twrIndex *= valueBefore / adjustedPrevValue;
     }
 
     // Apply buy/sell transactions
@@ -186,35 +195,18 @@ function twrReturn(index: (number | null)[], dates: string[], from: string): num
 }
 
 
-interface HistoryData {
-  dates: string[];
-  prices: Record<string, (number | null)[]>;
-}
-
 export default function PerformanceTab() {
   const transactions = usePortfolioStore((s) => s.transactions);
+  const history = usePortfolioStore((s) => s.history);
+  const loading = usePortfolioStore((s) => s.historyLoading);
+  const error = usePortfolioStore((s) => s.historyError);
   const [subTab, setSubTab] = useState<SubTab>('value');
   const [range, setRange] = useState<Range>('1y');
-  const [history, setHistory] = useState<HistoryData | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const firstTxDate = useMemo(() => {
     if (transactions.length === 0) return null;
     return [...transactions].sort((a, b) => a.date.localeCompare(b.date))[0].date;
   }, [transactions]);
-
-  const tickers = useMemo(() => [...new Set(transactions.map((t) => t.ticker))], [transactions]);
-
-  useEffect(() => {
-    if (tickers.length === 0 || !firstTxDate) return;
-    setLoading(true);
-    setError(null);
-    fetch(`/api/history?tickers=${tickers.join(',')}&from=${firstTxDate}`)
-      .then((r) => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
-      .then((data: HistoryData) => { setHistory(data); setLoading(false); })
-      .catch((e) => { setError(String(e)); setLoading(false); });
-  }, [tickers.join(','), firstTxDate]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const portfolioValues = useMemo(() => {
     if (!history) return [];
@@ -242,23 +234,9 @@ export default function PerformanceTab() {
     const spyPrices = history.prices['SPY'] ?? [];
 
     if (subTab === 'value') {
-      // Find the first date from startIdx where we have both a TWR value and an
-      // actual dollar value — this anchors the dollar scale for the period.
-      let baseIdx = startIdx;
-      while (baseIdx < history.dates.length && (twrIndex[baseIdx] == null || portfolioValues[baseIdx] == null)) {
-        baseIdx++;
-      }
-      const baseTwr = twrIndex[baseIdx];
-      const baseValue = portfolioValues[baseIdx];
-
       return history.dates.slice(startIdx).map((date, i) => {
         const idx = startIdx + i;
-        const twr = twrIndex[idx];
-        const value =
-          twr != null && baseTwr != null && baseTwr > 0 && baseValue != null
-            ? baseValue * (twr / baseTwr)
-            : null;
-        return { date, value };
+        return { date, value: portfolioValues[idx] };
       }).filter((d) => d.value != null);
     } else {
       const normPortfolio = normalizeTWR(twrIndex, startIdx);

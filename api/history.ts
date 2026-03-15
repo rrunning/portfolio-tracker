@@ -10,7 +10,7 @@ function unixToDate(ts: number): string {
 }
 
 async function fetchTicker(ticker: string, period1: number, period2: number) {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d`;
+  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?period1=${period1}&period2=${period2}&interval=1d&events=dividends`;
   const r = await fetch(url, {
     headers: { 'User-Agent': 'Mozilla/5.0 (compatible; portfolio-tracker/1.0)' },
   });
@@ -21,6 +21,9 @@ async function fetchTicker(ticker: string, period1: number, period2: number) {
       result?: Array<{
         timestamp?: number[];
         indicators?: { quote?: Array<{ close?: (number | null)[] }> };
+        events?: {
+          dividends?: Record<string, { amount: number; date: number }>;
+        };
       }>;
     };
   };
@@ -31,9 +34,15 @@ async function fetchTicker(ticker: string, period1: number, period2: number) {
   const timestamps = result.timestamp;
   const closes = result.indicators?.quote?.[0]?.close ?? [];
 
+  const rawDividends = result.events?.dividends ?? {};
+  const dividends: { date: string; amount: number }[] = Object.values(rawDividends).map(
+    (d) => ({ date: unixToDate(d.date), amount: d.amount })
+  );
+
   return {
     dates: timestamps.map(unixToDate),
     closes: closes.map((c) => c ?? null) as (number | null)[],
+    dividends,
   };
 }
 
@@ -57,6 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   const dateSet = new Set<string>();
   const tickerDataMap = new Map<string, Map<string, number | null>>();
+  const dividends: Record<string, { date: string; amount: number }[]> = {};
 
   for (const r of settled) {
     if (r.status !== 'fulfilled') continue;
@@ -67,6 +77,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       dateSet.add(data.dates[i]);
     }
     tickerDataMap.set(ticker, map);
+    if (data.dividends.length > 0) {
+      dividends[ticker] = data.dividends;
+    }
   }
 
   const dates = [...dateSet].sort();
@@ -75,5 +88,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     prices[ticker] = dates.map((d) => map.get(d) ?? null);
   }
 
-  return res.json({ dates, prices });
+  return res.json({ dates, prices, dividends });
 }

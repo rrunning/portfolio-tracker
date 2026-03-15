@@ -11,7 +11,11 @@ export default function PortfolioSummary() {
 
   const { holdings, realizedGains } = useMemo(() => derivePortfolio(transactions), [transactions]);
 
-  if (holdings.length === 0 && realizedGains.length === 0) return null;
+  const totalDividendIncome = transactions
+    .filter((t) => t.type === 'dividend')
+    .reduce((sum, t) => sum + t.shares * t.pricePerShare, 0);
+
+  if (holdings.length === 0 && realizedGains.length === 0 && totalDividendIncome === 0) return null;
 
   let totalCost = 0;
   let totalValue = 0;
@@ -37,7 +41,7 @@ export default function PortfolioSummary() {
   const isRealizedPositive = totalRealizedGainLoss >= 0;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
       <SummaryCard label="Total Cost Basis" value={fmt.format(totalCost)} />
       <SummaryCard
         label="Market Value"
@@ -73,6 +77,12 @@ export default function PortfolioSummary() {
         }
         accent={realizedGains.length > 0 ? (isRealizedPositive ? 'green' : 'red') : undefined}
         muted={realizedGains.length === 0}
+      />
+      <SummaryCard
+        label="Dividend Income"
+        value={totalDividendIncome > 0 ? fmt.format(totalDividendIncome) : '—'}
+        accent={totalDividendIncome > 0 ? 'green' : undefined}
+        muted={totalDividendIncome === 0}
       />
     </div>
   );
