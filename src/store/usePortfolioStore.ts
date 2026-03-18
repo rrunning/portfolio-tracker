@@ -23,6 +23,7 @@ interface PortfolioState {
   historyError: string | null;
   dividendPrefill: DividendPrefill | null;
   addTransaction: (transaction: Omit<Transaction, 'id'>) => void;
+  addTransactions: (transactions: Omit<Transaction, 'id'>[]) => void;
   removeTransaction: (id: string) => void;
   setPrices: (prices: PriceMap) => void;
   setLoading: (loading: boolean) => void;
@@ -50,6 +51,15 @@ export const usePortfolioStore = create<PortfolioState>()(
           transactions: [
             ...state.transactions,
             { ...transaction, id: crypto.randomUUID() },
+          ],
+        }));
+        syncToJSONBin(get().transactions);
+      },
+      addTransactions: (transactions) => {
+        set((state) => ({
+          transactions: [
+            ...state.transactions,
+            ...transactions.map((t) => ({ ...t, id: crypto.randomUUID() })),
           ],
         }));
         syncToJSONBin(get().transactions);

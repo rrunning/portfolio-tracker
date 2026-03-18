@@ -93,7 +93,7 @@ const TEMPLATE = [
 ].join('\n');
 
 export default function CSVImport() {
-  const addTransaction = usePortfolioStore((s) => s.addTransaction);
+  const addTransactions = usePortfolioStore((s) => s.addTransactions);
   const inputRef = useRef<HTMLInputElement>(null);
   const [result, setResult] = useState<ImportResult | null>(null);
 
@@ -105,7 +105,7 @@ export default function CSVImport() {
     reader.onload = (ev) => {
       const text = ev.target?.result as string;
       const { valid, errors } = parseCSV(text);
-      valid.forEach((tx) => addTransaction(tx));
+      addTransactions(valid);
       setResult({ imported: valid.length, errors });
       if (inputRef.current) inputRef.current.value = '';
     };
