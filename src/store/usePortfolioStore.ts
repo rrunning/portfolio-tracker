@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import type { Transaction, PriceMap, HistoryData, DividendPrefill } from '../types';
+import { saveToJSONBin } from '../services/jsonbin';
+
+function syncToJSONBin(transactions: Transaction[]): void {
+  const binId = localStorage.getItem('jsonbin_bin_id');
+  const apiKey = localStorage.getItem('jsonbin_api_key');
+  if (!binId || !apiKey) return;
+  saveToJSONBin(binId, apiKey, transactions).catch((err) => {
+    console.error('JSONBin auto-save failed:', err);
+  });
+}
 
 interface PortfolioState {
   transactions: Transaction[];
@@ -26,7 +36,7 @@ interface PortfolioState {
 
 export const usePortfolioStore = create<PortfolioState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       transactions: [],
       prices: {},
       loading: false,
@@ -35,17 +45,21 @@ export const usePortfolioStore = create<PortfolioState>()(
       historyLoading: false,
       historyError: null,
       dividendPrefill: null,
-      addTransaction: (transaction) =>
+      addTransaction: (transaction) => {
         set((state) => ({
           transactions: [
             ...state.transactions,
             { ...transaction, id: crypto.randomUUID() },
           ],
-        })),
-      removeTransaction: (id) =>
+        }));
+        syncToJSONBin(get().transactions);
+      },
+      removeTransaction: (id) => {
         set((state) => ({
           transactions: state.transactions.filter((t) => t.id !== id),
-        })),
+        }));
+        syncToJSONBin(get().transactions);
+      },
       setPrices: (prices) => set({ prices }),
       setLoading: (loading) => set({ loading }),
       setError: (error) => set({ error }),
