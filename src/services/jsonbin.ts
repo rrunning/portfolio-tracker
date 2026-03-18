@@ -1,4 +1,4 @@
-import { Transaction } from '../types';
+import type { Transaction } from '../types';
 
 const BASE_URL = 'https://api.jsonbin.io/v3/b';
 

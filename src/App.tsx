@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useFetchPrices } from './hooks/useFetchPrices';
 import { useFetchHistory } from './hooks/useFetchHistory';
 import AddTransactionForm from './components/AddTransactionForm';
@@ -11,12 +11,35 @@ import TransactionsTable from './components/TransactionsTable';
 import PerformanceTab from './components/PerformanceTab';
 import DividendSuggestionBanner from './components/DividendSuggestionBanner';
 import SettingsPanel from './components/SettingsPanel';
+import { loadFromJSONBin } from './services/jsonbin';
+import { usePortfolioStore } from './store/usePortfolioStore';
 
 export default function App() {
   useFetchPrices();
   useFetchHistory();
+  const setTransactions = usePortfolioStore((s) => s.setTransactions);
   const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'transactions'>('overview');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [jsonbinLoading, setJsonbinLoading] = useState(false);
+  const [jsonbinError, setJsonbinError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const binId = localStorage.getItem('jsonbin_bin_id');
+    const apiKey = localStorage.getItem('jsonbin_api_key');
+    if (!binId || !apiKey) return;
+
+    setJsonbinLoading(true);
+    loadFromJSONBin(binId, apiKey)
+      .then((transactions) => {
+        setTransactions(transactions);
+      })
+      .catch((err: unknown) => {
+        setJsonbinError(err instanceof Error ? err.message : 'Failed to load data from JSONBin.');
+      })
+      .finally(() => {
+        setJsonbinLoading(false);
+      });
+  }, [setTransactions]);
 
   return (
     <div className="min-h-screen bg-gray-950 text-gray-100 p-6 max-w-6xl mx-auto">
@@ -35,6 +58,21 @@ export default function App() {
         </button>
       </div>
       {settingsOpen && <SettingsPanel onClose={() => setSettingsOpen(false)} />}
+      {jsonbinLoading && (
+        <p className="text-sm text-gray-400 mb-4">Loading portfolio from JSONBin…</p>
+      )}
+      {jsonbinError && (
+        <div className="flex items-center justify-between bg-red-900/40 border border-red-700 text-red-300 text-sm rounded px-4 py-2 mb-4">
+          <span>{jsonbinError}</span>
+          <button
+            onClick={() => setJsonbinError(null)}
+            className="ml-4 text-red-400 hover:text-red-200 transition-colors"
+            aria-label="Dismiss error"
+          >
+            ✕
+          </button>
+        </div>
+      )}
       <TabNav activeTab={activeTab} onChange={setActiveTab} />
       {activeTab === 'overview' && <PerformanceTab />}
       {activeTab === 'holdings' && (

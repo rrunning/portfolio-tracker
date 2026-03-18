@@ -21,6 +21,7 @@ interface PortfolioState {
   setHistoryLoading: (loading: boolean) => void;
   setHistoryError: (error: string | null) => void;
   setDividendPrefill: (prefill: DividendPrefill | null) => void;
+  setTransactions: (transactions: Transaction[]) => void;
 }
 
 export const usePortfolioStore = create<PortfolioState>()(
@@ -52,6 +53,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       setHistoryLoading: (historyLoading) => set({ historyLoading }),
       setHistoryError: (historyError) => set({ historyError }),
       setDividendPrefill: (dividendPrefill) => set({ dividendPrefill }),
+      setTransactions: (transactions) => set({ transactions }),
     }),
     {
       name: 'portfolio-storage',
