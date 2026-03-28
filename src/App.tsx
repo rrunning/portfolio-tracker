@@ -78,8 +78,10 @@ export default function App() {
       {activeTab === 'overview' && <PerformanceTab />}
       {activeTab === 'holdings' && (
         <>
-          <PortfolioSummary />
-          <AllocationChart />
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6 mb-6">
+            <AllocationChart />
+            <PortfolioSummary />
+          </div>
           <HoldingsTable />
         </>
       )}

@@ -41,7 +41,7 @@ export default function AllocationChart() {
   const anyUsingCostBasis = data.some((d) => d.usingCostBasis);
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 mb-6">
+    <div className="bg-gray-900 rounded-xl border border-gray-800 p-5 min-w-0">
       <div className="flex items-baseline justify-between mb-4">
         <h2 className="text-sm font-medium text-gray-500 uppercase tracking-wider">
           Portfolio Allocation

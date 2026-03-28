@@ -41,7 +41,7 @@ export default function PortfolioSummary() {
   const isRealizedPositive = totalRealizedGainLoss >= 0;
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+    <div className="grid grid-cols-2 gap-4 content-start lg:content-normal lg:grid-rows-3">
       <SummaryCard label="Total Cost Basis" value={fmt.format(totalCost)} />
       <SummaryCard
         label="Market Value"
@@ -109,7 +109,7 @@ function SummaryCard({
       : 'text-white';
 
   return (
-    <div className="bg-gray-900 rounded-xl border border-gray-800 px-5 py-4">
+    <div className="bg-gray-900 rounded-xl border border-gray-800 px-5 py-4 text-center flex flex-col justify-center h-full">
       <p className="text-xs text-gray-500 uppercase tracking-wider mb-1">{label}</p>
       <p className={`text-xl font-semibold ${valueColor}`}>{value}</p>
     </div>
