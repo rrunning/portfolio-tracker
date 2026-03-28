@@ -19,6 +19,7 @@ export default function App() {
   useFetchHistory();
   const setTransactions = usePortfolioStore((s) => s.setTransactions);
   const [activeTab, setActiveTab] = useState<'overview' | 'holdings' | 'transactions'>('overview');
+  const [activePanel, setActivePanel] = useState<'add' | 'csv' | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [jsonbinLoading, setJsonbinLoading] = useState(false);
   const [jsonbinError, setJsonbinError] = useState<string | null>(null);
@@ -85,8 +86,24 @@ export default function App() {
       {activeTab === 'transactions' && (
         <>
           <DividendSuggestionBanner />
-          <AddTransactionForm />
-          <CSVImport />
+          <div className="flex gap-6 mb-4">
+            <button
+              onClick={() => setActivePanel((p) => (p === 'add' ? null : 'add'))}
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <span className={`transition-transform ${activePanel === 'add' ? 'rotate-90' : ''}`}>▶</span>
+              Add Transaction
+            </button>
+            <button
+              onClick={() => setActivePanel((p) => (p === 'csv' ? null : 'csv'))}
+              className="flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-200 transition-colors"
+            >
+              <span className={`transition-transform ${activePanel === 'csv' ? 'rotate-90' : ''}`}>▶</span>
+              Import CSV
+            </button>
+          </div>
+          {activePanel === 'add' && <AddTransactionForm />}
+          {activePanel === 'csv' && <CSVImport />}
           <TransactionsTable />
         </>
       )}

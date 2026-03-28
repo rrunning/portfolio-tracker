@@ -124,7 +124,6 @@ export default function CSVImport() {
 
   return (
     <div className="bg-gray-900 rounded-xl p-5 mb-6 border border-gray-800">
-      <h2 className="text-lg font-semibold mb-1">Import CSV</h2>
       <p className="text-xs text-gray-500 mb-4">
         Buy/Sell: <code className="text-gray-400">ticker, type (buy/sell), date (YYYY-MM-DD), shares, pricePerShare</code>
         <br />

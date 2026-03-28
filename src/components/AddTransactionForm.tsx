@@ -89,7 +89,6 @@ export default function AddTransactionForm() {
 
   return (
     <form id="add-transaction-form" ref={formRef} onSubmit={handleSubmit} className="bg-gray-900 rounded-xl p-5 mb-6 border border-gray-800">
-      <h2 className="text-lg font-semibold mb-4">Add Transaction</h2>
       <div className="flex flex-col sm:flex-row gap-3 flex-wrap">
         <input
           type="text"

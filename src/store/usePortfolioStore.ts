@@ -47,13 +47,7 @@ export const usePortfolioStore = create<PortfolioState>()(
       historyError: null,
       dividendPrefill: null,
       addTransaction: (transaction) => {
-        set((state) => ({
-          transactions: [
-            ...state.transactions,
-            { ...transaction, id: crypto.randomUUID() },
-          ],
-        }));
-        syncToJSONBin(get().transactions);
+        get().addTransactions([transaction]);
       },
       addTransactions: (transactions) => {
         set((state) => ({
